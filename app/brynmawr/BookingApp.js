@@ -351,6 +351,7 @@ export default function BookingApp(){
     if(hovered===s.id&&st==='available') return 'rgba(255,255,255,0.22)'
     if(st==='booked')  return 'rgba(192,57,43,0.58)'
     if(st==='toolong') return 'rgba(230,126,34,0.55)'
+    if(s.zone==='parkmod') return 'rgba(36,113,163,0.85)'
     if(s.zone==='parkmod') return 'rgba(36,113,163,0.78)'
     return 'rgba(39,174,96,0.72)'
   }
@@ -591,4 +592,5 @@ const cS={background:'rgba(255,255,255,0.06)',border:'1px solid rgba(93,184,168,
 const cA={background:C.teal,borderColor:C.teal,color:'#0f2030',fontWeight:700}
 const gS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%'}
 const rS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:11,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%'}
+
 
