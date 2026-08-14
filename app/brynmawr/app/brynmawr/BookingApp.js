@@ -330,7 +330,10 @@ const css = `
     .bm-sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid rgba(93,184,168,0.15); padding: 10px; gap: 8px; }
     .bm-sidebar-fields { display: flex; gap: 8px; flex-wrap: wrap; }
     .bm-sidebar-fields > * { flex: 1; min-width: 140px; }
-    .bm-map-col { padding: 0; overflow-x: auto; }
+    .bm-map-col { padding: 0; overflow-x: hidden; width: 100%; }
+    .bm-map-col > div { width: 100% !important; height: auto !important; }
+    .bm-map-col img { width: 100% !important; height: auto !important; }
+    .bm-map-col svg { width: 100% !important; height: auto !important; }
     .bm-detail { width: 100%; min-width: unset; border-left: none; border-top: 1px solid rgba(93,184,168,0.15); }
     .bm-detail-body { padding: 12px; }
     .bm-footer { display: none; }
@@ -392,6 +395,7 @@ export default function BookingApp(){
   const MAP_DISPLAY_W = 580
   const SCALE = MAP_DISPLAY_W / MAP_W
   const MAP_DISPLAY_H = Math.round(MAP_H * SCALE)
+
 
   return(
     <>
