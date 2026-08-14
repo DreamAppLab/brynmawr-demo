@@ -324,10 +324,10 @@ export default function BookingApp(){
   const[errors,setErrors]=useState({})
   const[hovered,setHovered]=useState(null)
   const[showPanel,setShowPanel]=useState(false)
-  const[isMobile,setIsMobile]=useState(false)
+  const[isMobile,setIsMobile]=useState(true)
 
   useEffect(()=>{
-    const check=()=>setIsMobile(window.innerWidth<768)
+    const check=()=>setIsMobile(window.innerWidth<900)
     check()
     window.addEventListener('resize',check)
     return()=>window.removeEventListener('resize',check)
@@ -368,7 +368,7 @@ export default function BookingApp(){
   }
 
   // Map scales to screen width
-  const mapDisplayW = isMobile ? Math.min(window?.innerWidth || 390, 500) : 620
+  const mapDisplayW = isMobile ? 390 : 620
   const SCALE = mapDisplayW / MAP_W
   const mapDisplayH = Math.round(MAP_H * SCALE)
 
