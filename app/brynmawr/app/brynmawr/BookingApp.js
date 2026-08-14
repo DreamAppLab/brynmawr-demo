@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const C = {
-  navy:'#1a2d4a', navyDark:'#152338', teal:'#5db8a8', tealDark:'#4aa090',
-  white:'#ffffff', green:'#27ae60', orange:'#e67e22', red:'#c0392b',
-  blue:'#2471a3', gold:'#c9a84c',
+  navy:'#1a2d4a', navyDark:'#152338', teal:'#5db8a8',
+  white:'#ffffff', green:'#27ae60', orange:'#e67e22',
+  red:'#c0392b', blue:'#2471a3', gold:'#c9a84c',
 }
 
 const MAP_W = 762
@@ -262,6 +262,7 @@ const SITES = [
   {id:'249',zone:'midpark',maxLen:55,sqft:0,points:'292.1,154.3 296.1,157.3 300.0,159.8 305.5,162.5 312.2,164.1 318.5,164.3 327.4,164.4 332.3,163.6 339.8,162.2 349.9,159.3 344.9,153.8 340.3,151.6 335.0,150.1 329.0,149.1 322.1,148.6 316.6,148.3 308.6,148.2 305.2,148.7 301.5,149.6 297.9,150.1 294.1,152.2'},
   {id:'250',zone:'midpark',maxLen:55,sqft:0,points:'371.3,149.3 374.8,147.4 380.3,146.3 385.3,146.4 409.3,146.4 415.4,147.2 423.8,149.4 431.8,153.5 429.6,154.5 425.6,155.7 419.5,157.2 415.3,158.2 409.8,158.8 403.8,159.2 395.7,159.1 390.5,158.3 384.0,157.2 377.5,154.1'},
 ]
+
 const BOOKED = new Set(['219','225','81','108','121','134','149','168','3','15','29','44','211','177','200'])
 
 const SPECIAL_EVENTS = [
@@ -322,6 +323,15 @@ export default function BookingApp(){
   const[form,setForm]=useState({name:'',email:'',phone:'',rig:''})
   const[errors,setErrors]=useState({})
   const[hovered,setHovered]=useState(null)
+  const[showPanel,setShowPanel]=useState(false)
+  const[isMobile,setIsMobile]=useState(false)
+
+  useEffect(()=>{
+    const check=()=>setIsMobile(window.innerWidth<768)
+    check()
+    window.addEventListener('resize',check)
+    return()=>window.removeEventListener('resize',check)
+  },[])
 
   const numLen=parseInt(rvLen)||0
   const cost=selected?totalCost(selected.zone,arrival,departure):null
@@ -329,11 +339,12 @@ export default function BookingApp(){
   const activeSpecial=selected?isSpecial(arrival):null
   const visible=SITES.filter(s=>filter==='all'||s.zone===filter)
 
-  function handleSearch(){setSearched(true);setSelected(null);setStep('map')}
+  function handleSearch(){setSearched(true);setSelected(null);setStep('map');setShowPanel(false)}
 
   function handleClick(s){
     if(!searched||siteState(s,numLen)!=='available') return
     setSelected(s);setStep('map')
+    if(isMobile) setShowPanel(true)
   }
 
   function handleSubmit(){
@@ -350,229 +361,286 @@ export default function BookingApp(){
     if(selected?.id===s.id) return 'rgba(93,184,168,0.85)'
     if(!searched) return 'transparent'
     if(st==='booked') return 'rgba(192,57,43,0.75)'
-    if(s.zone==='parkmod') return hovered===s.id ? 'rgba(52,152,219,0.90)' : 'rgba(36,113,163,0.78)'
+    if(s.zone==='parkmod') return 'rgba(36,113,163,0.85)'
     if(hovered===s.id&&st==='available') return 'rgba(255,255,255,0.40)'
     if(st==='toolong') return 'rgba(230,126,34,0.78)'
     return 'rgba(39,174,96,0.72)'
   }
 
-  const DISPLAY_W=620
-  const SCALE=DISPLAY_W/MAP_W
-  const DISPLAY_H=Math.round(MAP_H*SCALE)
+  // Map scales to screen width
+  const mapDisplayW = isMobile ? Math.min(window?.innerWidth || 390, 500) : 620
+  const SCALE = mapDisplayW / MAP_W
+  const mapDisplayH = Math.round(MAP_H * SCALE)
+
+  const DetailPanel = ()=>(
+    <div style={{background:C.navyDark,padding:16,display:'flex',flexDirection:'column',gap:10,overflowY:'auto',maxHeight:isMobile?'70vh':'100%'}}>
+      {step==='map'&&!selected&&(
+        <div style={{color:'rgba(255,255,255,0.45)',fontSize:12,fontFamily:'sans-serif',textAlign:'center',padding:'24px 10px',lineHeight:1.9}}>
+          {searched
+            ?<>Tap any <span style={{color:C.green,fontWeight:600}}>green site</span> on the map to view details and reserve.</>
+            :<>Set your dates and click <span style={{color:C.teal}}>Show available sites</span> to get started.</>}
+        </div>
+      )}
+      {step==='map'&&selected&&(<>
+        <div style={{fontSize:22,fontWeight:700,color:C.teal}}>Site {selected.id}</div>
+        <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',textTransform:'uppercase',letterSpacing:1,fontFamily:'sans-serif'}}>{ZL[selected.zone]}</div>
+        <span style={{display:'inline-block',background:'rgba(39,174,96,0.14)',color:C.green,padding:'2px 8px',borderRadius:10,fontSize:9,fontFamily:'sans-serif',fontWeight:700,letterSpacing:1}}>AVAILABLE</span>
+        <div>
+          {selected.zone!=='parkmod'&&<DR label="Max RV length" val={`${selected.maxLen} ft`}/>}
+          {selected.zone==='parkmod'&&<DR label="Deposit required" val="$250"/>}
+          <DR label="Hookup" val={selected.zone==='parkmod'?'Full kitchen + linens':'30/50 amp · water · sewer'}/>
+          {cost&&<DR label="Avg nightly" val={`$${Math.round(cost.subtotal/cost.nights)}`}/>}
+          {cost&&<DR label="Nights" val={cost.nights}/>}
+        </div>
+        {cost&&(
+          <div style={{background:'rgba(93,184,168,0.08)',border:'1px solid rgba(93,184,168,0.22)',borderRadius:7,padding:'10px 12px'}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:1,fontFamily:'sans-serif'}}>Estimated total</div>
+            <div style={{fontSize:22,color:C.teal,fontWeight:700,margin:'3px 0'}}>${cost.grand.toLocaleString()}</div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,0.38)',fontFamily:'sans-serif'}}>Subtotal ${cost.subtotal} + ${cost.tax} tax (11.5%)</div>
+            {selected.zone==='parkmod'&&<div style={{fontSize:9,color:'rgba(255,255,255,0.32)',marginTop:3,fontFamily:'sans-serif'}}>+ $100 cleaning fee</div>}
+          </div>
+        )}
+        {activeSpecial&&<div style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.22)',borderRadius:5,padding:'6px 9px',fontSize:9,color:C.gold,fontFamily:'sans-serif',lineHeight:1.5}}>⚠ {activeSpecial.name} — +$25/night · 3-night minimum</div>}
+        <button onClick={()=>setStep('form')} style={rS}>Reserve this site →</button>
+        <div style={{fontSize:9,color:'rgba(255,255,255,0.28)',textAlign:'center',lineHeight:1.6,fontFamily:'sans-serif'}}>Deposit at check-in. Office confirms within 24 hrs.</div>
+        {isMobile&&<button onClick={()=>setShowPanel(false)} style={backS}>← Back to map</button>}
+      </>)}
+      {step==='form'&&selected&&(<>
+        <div style={{background:'rgba(93,184,168,0.08)',border:'1px solid rgba(93,184,168,0.18)',borderRadius:5,padding:'6px 10px',fontSize:11,color:C.white,fontFamily:'sans-serif'}}>
+          Site {selected.id} · {cost?.nights} night{cost?.nights!==1?'s':''}{cost?` · $${cost.grand.toLocaleString()}`:''}
+        </div>
+        {[{k:'name',l:'Full name',t:'text',p:'Jane Smith'},{k:'email',l:'Email',t:'email',p:'jane@example.com'},{k:'phone',l:'Phone',t:'tel',p:'(904) 555-0100'},{k:'rig',l:'RV make/model (optional)',t:'text',p:'e.g. Entegra Cornerstone'}].map(f=>(
+          <div key={f.k} style={{display:'flex',flexDirection:'column',gap:3}}>
+            <label style={{fontSize:10,color:'rgba(255,255,255,0.4)',fontFamily:'sans-serif'}}>{f.l}</label>
+            <input type={f.t} placeholder={f.p} value={form[f.k]} onChange={e=>{setForm(p=>({...p,[f.k]:e.target.value}));setErrors(p=>({...p,[f.k]:''}))} } style={{...iSt,...(errors[f.k]?{borderColor:C.red}:{})}}/>
+            {errors[f.k]&&<span style={{fontSize:10,color:C.red,fontFamily:'sans-serif'}}>{errors[f.k]}</span>}
+          </div>
+        ))}
+        <button onClick={handleSubmit} style={rS}>Submit reservation →</button>
+        <button onClick={()=>setStep('map')} style={backS}>← Back to map</button>
+      </>)}
+      {step==='confirm'&&selected&&(
+        <div style={{textAlign:'center',paddingTop:12}}>
+          <div style={{fontSize:36,marginBottom:8}}>🌊</div>
+          <div style={{fontSize:14,color:C.teal,fontFamily:'Georgia,serif',marginBottom:6}}>Request submitted!</div>
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',fontFamily:'sans-serif',lineHeight:1.7,marginBottom:10}}>The Bryn Mawr team will confirm by email within 24 hours.</div>
+          <div style={{background:'rgba(93,184,168,0.07)',border:'1px solid rgba(93,184,168,0.18)',borderRadius:6,padding:'9px 11px',marginBottom:10,textAlign:'left'}}>
+            <DR label="Name" val={form.name}/>
+            <DR label="Site" val={`${selected.id} · ${ZL[selected.zone]}`}/>
+            <DR label="Arrival" val={arrival}/>
+            <DR label="Departure" val={departure}/>
+            {cost&&<DR label="Est. total" val={`$${cost.grand.toLocaleString()}`}/>}
+          </div>
+          <div style={{fontSize:9,color:'rgba(255,255,255,0.28)',marginBottom:10,lineHeight:1.6,fontFamily:'sans-serif'}}>No payment required now. Deposit due at check-in.</div>
+          <button onClick={()=>{setStep('map');setSelected(null);setSearched(false);setShowPanel(false)}} style={rS}>Start a new search</button>
+        </div>
+      )}
+    </div>
+  )
 
   return(
     <div style={{background:C.navy,minHeight:'100vh',display:'flex',flexDirection:'column',fontFamily:'sans-serif'}}>
 
-      <header style={{background:C.navyDark,borderBottom:`3px solid ${C.teal}`,padding:'0 20px'}}>
-        <div style={{maxWidth:1300,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between',height:58}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:40,height:40,background:C.teal,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:14}}>BM</div>
+      {/* Header */}
+      <header style={{background:C.navyDark,borderBottom:`3px solid ${C.teal}`,padding:'0 16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',height:52}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{width:36,height:36,background:C.teal,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:13,flexShrink:0}}>BM</div>
             <div>
-              <div style={{color:C.white,fontSize:14,fontWeight:700,letterSpacing:2,fontFamily:'Georgia,serif',textTransform:'uppercase',lineHeight:1.1}}>Bryn Mawr Ocean Resort</div>
-              <div style={{color:C.teal,fontSize:9,letterSpacing:1.5,textTransform:'uppercase'}}>St. Augustine Beach, FL · Online Reservations</div>
+              <div style={{color:C.white,fontSize:isMobile?11:14,fontWeight:700,letterSpacing:2,fontFamily:'Georgia,serif',textTransform:'uppercase',lineHeight:1.1}}>Bryn Mawr Ocean Resort</div>
+              <div style={{color:C.teal,fontSize:8,letterSpacing:1,textTransform:'uppercase'}}>St. Augustine Beach · Online Reservations</div>
             </div>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:14}}>
-            <a href="https://brynmawroceanresort.net" target="_blank" rel="noopener noreferrer" style={{color:'rgba(255,255,255,0.5)',fontSize:11,textDecoration:'none'}}>← Main Site</a>
-            <div style={{background:'rgba(93,184,168,0.12)',border:`1px solid ${C.teal}`,color:C.teal,fontSize:9,padding:'3px 10px',borderRadius:16,letterSpacing:1}}>DEMO · Dream App Lab</div>
-          </div>
+          <div style={{background:'rgba(93,184,168,0.12)',border:`1px solid ${C.teal}`,color:C.teal,fontSize:8,padding:'3px 8px',borderRadius:16,letterSpacing:1,flexShrink:0}}>DEMO</div>
         </div>
       </header>
 
-      <div style={{background:'#1e3a5a',padding:'10px 20px',borderBottom:'1px solid rgba(93,184,168,0.18)',textAlign:'center'}}>
-        <div style={{fontSize:18,color:C.white,fontFamily:'Georgia,serif',marginBottom:2}}>Reserve Your Site</div>
-        <div style={{fontSize:11,color:C.teal,letterSpacing:1}}>Choose your dates · Filter by type · Click your site directly on the park map</div>
-      </div>
+      {isMobile ? (
+        /* ── MOBILE LAYOUT ── */
+        <div style={{display:'flex',flexDirection:'column',flex:1}}>
 
-      <div style={{display:'flex',flex:1,width:'100%',minWidth:900,overflowX:'auto'}}>
-
-        {/* SIDEBAR */}
-        <aside style={{width:220,minWidth:220,background:C.navyDark,borderRight:'1px solid rgba(93,184,168,0.12)',padding:14,display:'flex',flexDirection:'column',gap:12,overflowY:'auto'}}>
-          <S label="Your Stay">
-            <F label="Arrival"><input type="date" value={arrival} onChange={e=>setArrival(e.target.value)} style={iS}/></F>
-            <F label="Departure"><input type="date" value={departure} onChange={e=>setDeparture(e.target.value)} style={iS}/></F>
-            {nights>0&&<div style={{background:'rgba(93,184,168,0.1)',border:'1px solid rgba(93,184,168,0.25)',borderRadius:14,padding:'3px 10px',fontSize:11,color:C.teal,textAlign:'center'}}>{nights} night{nights>1?'s':''}</div>}
-            {activeSpecial&&<div style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.25)',borderRadius:5,padding:'5px 8px',fontSize:9,color:C.gold,lineHeight:1.5}}>⚠ {activeSpecial.name}<br/>+$25/night · 3-night min</div>}
-          </S>
-          <Hr/>
-          <S label="Your RV">
-            <F label="Length in feet"><input type="number" value={rvLen} onChange={e=>setRvLen(e.target.value)} placeholder="e.g. 40" min="10" max="80" style={iS}/></F>
-            <div style={{fontSize:9,color:'rgba(255,255,255,0.3)',lineHeight:1.5}}>Sites too small for your rig will show orange. Leave blank for park models.</div>
-          </S>
-          <Hr/>
-          <S label="Filter by type">
-            <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+          {/* Mobile search controls */}
+          <div style={{background:C.navyDark,padding:12,display:'flex',flexDirection:'column',gap:8,borderBottom:'1px solid rgba(93,184,168,0.15)'}}>
+            <div style={{display:'flex',gap:8}}>
+              <div style={{flex:1}}>
+                <label style={{fontSize:9,color:C.teal,textTransform:'uppercase',letterSpacing:1,display:'block',marginBottom:3}}>Arrival</label>
+                <input type="date" value={arrival} onChange={e=>setArrival(e.target.value)} style={{...iSt,fontSize:12,padding:'6px 8px'}}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{fontSize:9,color:C.teal,textTransform:'uppercase',letterSpacing:1,display:'block',marginBottom:3}}>Departure</label>
+                <input type="date" value={departure} onChange={e=>setDeparture(e.target.value)} style={{...iSt,fontSize:12,padding:'6px 8px'}}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+              <div style={{flex:1}}>
+                <label style={{fontSize:9,color:C.teal,textTransform:'uppercase',letterSpacing:1,display:'block',marginBottom:3}}>RV Length (ft)</label>
+                <input type="number" value={rvLen} onChange={e=>setRvLen(e.target.value)} placeholder="e.g. 40" style={{...iSt,fontSize:12,padding:'6px 8px'}}/>
+              </div>
+              <button onClick={handleSearch} style={{...gS,flex:1,padding:'9px 8px',fontSize:11}}>Show Sites</button>
+            </div>
+            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
               {FILTERS.map(f=><button key={f.k} onClick={()=>setFilter(f.k)} style={{...cS,...(filter===f.k?cA:{})}}>{f.l}</button>)}
             </div>
-          </S>
-          <button onClick={handleSearch} style={gS}>Show available sites</button>
-          <Hr/>
-          <S label="Legend">
-            <L color={C.green}  label="Available"/>
-            <L color={C.orange} label="Too small for your rig"/>
-            <L color={C.red}    label="Already reserved"/>
-            <L color={C.blue}   label="Park model"/>
-            <L color={C.teal}   label="Your selection"/>
-          </S>
-          <Hr/>
-          <S label="Resort info">
-            <IR label="Check-in"  val="2:00 PM"/>
-            <IR label="Check-out" val="11 AM · PM 10 AM"/>
-            <IR label="Office"    val="Mon–Sat 9–5 · Sun 9–4"/>
-            <IR label="Phone"     val="(904) 471-3353"/>
-            <IR label="Tax"       val="+11.5% at checkout"/>
-          </S>
-        </aside>
-
-        {/* MAP */}
-        <div style={{flex:1,background:'#0a1810',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'10px 6px',overflowY:'auto'}}>
-          <div style={{position:'relative',width:DISPLAY_W,height:DISPLAY_H,flexShrink:0,borderRadius:6,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.5)'}}>
-
-            <img src="/parkmap.png" alt="Bryn Mawr Ocean Resort park map" style={{width:DISPLAY_W,height:DISPLAY_H,display:'block',userSelect:'none'}} draggable={false}/>
-
-            {!searched&&(
-              <div style={{position:'absolute',inset:0,background:'rgba(8,18,28,0.75)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <div style={{background:'rgba(21,35,56,0.97)',border:`1px solid rgba(93,184,168,0.45)`,borderRadius:10,padding:'22px 26px',maxWidth:230,textAlign:'center'}}>
-                  <div style={{fontSize:30,marginBottom:8}}>🗺️</div>
-                  <div style={{fontSize:13,color:C.teal,fontFamily:'Georgia,serif',marginBottom:6}}>Enter your dates first</div>
-                  <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',lineHeight:1.7}}>Click <em style={{color:C.teal}}>Show available sites</em> — then tap any green site directly on the park map.</div>
-                </div>
-              </div>
-            )}
-
-            {/* Transparent SVG overlay with proper diagonal polygon zones */}
-            <svg
-              style={{position:'absolute',top:0,left:0,width:DISPLAY_W,height:DISPLAY_H}}
-              viewBox={`0 0 ${MAP_W} ${MAP_H}`}
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {visible.map(s=>{
-                const st=siteState(s,numLen)
-                const fill=overlayFill(s)
-                const isSel=selected?.id===s.id
-                const clickable=searched&&st==='available'
-                return(
-                  <polygon
-                    key={s.id}
-                    points={s.points}
-                    fill={fill}
-                    stroke={isSel?'#ffffff':searched?'rgba(255,255,255,0.6)':'transparent'}
-                    strokeWidth={isSel?2:1}
-                    style={{cursor:clickable?'pointer':searched&&st!=='available'?'not-allowed':'default',transition:'fill 0.12s'}}
-                    onClick={()=>handleClick(s)}
-                    onMouseEnter={()=>setHovered(s.id)}
-                    onMouseLeave={()=>setHovered(null)}
-                  />
-                )
-              })}
-            </svg>
-
-            {/* Hover tooltip */}
-            {hovered&&searched&&(()=>{
-              const s=SITES.find(x=>x.id===hovered)
-              if(!s) return null
-              const st=siteState(s,numLen)
-              const stLabel=st==='booked'?'Reserved':st==='toolong'?'Too small for your rig':'Available — tap to select'
-              const stColor=st==='booked'?C.red:st==='toolong'?C.orange:C.green
-              const pts=s.points.split(' ').map(p=>p.split(',').map(Number))
-              const cx=Math.round(pts.reduce((a,p)=>a+p[0],0)/pts.length)
-              const cy=Math.round(pts.reduce((a,p)=>a+p[1],0)/pts.length)
-              const tx=Math.min(cx*SCALE+8,DISPLAY_W-145)
-              const ty=Math.max(cy*SCALE-52,4)
-              return(
-                <div style={{position:'absolute',left:tx,top:ty,background:'rgba(12,22,36,0.97)',border:`1px solid rgba(93,184,168,0.45)`,borderRadius:6,padding:'7px 11px',fontSize:11,color:'#fff',pointerEvents:'none',whiteSpace:'nowrap',zIndex:10,lineHeight:1.5}}>
-                  <div style={{fontWeight:700,fontSize:13}}>Site {s.id}</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>{ZL[s.zone]}</div>
-                  <div style={{fontSize:10,color:stColor,fontWeight:600,marginTop:2}}>{stLabel}</div>
-                  {s.maxLen>0&&<div style={{fontSize:9,color:'rgba(255,255,255,0.38)',marginTop:1}}>Max {s.maxLen} ft RV</div>}
-                </div>
-              )
-            })()}
           </div>
+
+          {/* Mobile map - full width */}
+          {!showPanel&&(
+            <div style={{position:'relative',width:'100%',overflowX:'auto',background:'#0a1810'}}>
+              <div style={{position:'relative',width:mapDisplayW,height:mapDisplayH,margin:'0 auto'}}>
+                <img src="/parkmap.png" alt="Park map" style={{width:mapDisplayW,height:mapDisplayH,display:'block'}} draggable={false}/>
+                {!searched&&(
+                  <div style={{position:'absolute',inset:0,background:'rgba(8,18,28,0.78)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <div style={{background:C.navyDark,border:`1px solid rgba(93,184,168,0.45)`,borderRadius:10,padding:'20px',maxWidth:240,textAlign:'center'}}>
+                      <div style={{fontSize:28,marginBottom:8}}>🗺️</div>
+                      <div style={{fontSize:13,color:C.teal,fontFamily:'Georgia,serif',marginBottom:6}}>Enter your dates first</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',lineHeight:1.7}}>Tap <em style={{color:C.teal}}>Show Sites</em> then tap any green site on the map.</div>
+                    </div>
+                  </div>
+                )}
+                <svg style={{position:'absolute',top:0,left:0,width:mapDisplayW,height:mapDisplayH}} viewBox={`0 0 ${MAP_W} ${MAP_H}`}>
+                  {visible.map(s=>{
+                    const st=siteState(s,numLen)
+                    const fill=overlayFill(s)
+                    const clickable=searched&&st==='available'
+                    const isSel=selected?.id===s.id
+                    return(
+                      <polygon key={s.id} points={s.points} fill={fill}
+                        stroke={isSel?'#fff':searched?'rgba(255,255,255,0.5)':'transparent'}
+                        strokeWidth={isSel?2:0.8}
+                        style={{cursor:clickable?'pointer':'default'}}
+                        onClick={()=>handleClick(s)}
+                        onMouseEnter={()=>setHovered(s.id)}
+                        onMouseLeave={()=>setHovered(null)}
+                      />
+                    )
+                  })}
+                </svg>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile detail panel - slides up when site selected */}
+          {showPanel&&<DetailPanel/>}
+
+          {/* Mobile legend */}
+          {!showPanel&&searched&&(
+            <div style={{background:C.navyDark,padding:'8px 12px',display:'flex',gap:12,flexWrap:'wrap',borderTop:'1px solid rgba(93,184,168,0.15)'}}>
+              <Leg color={C.green}  label="Available"/>
+              <Leg color={C.red}    label="Reserved"/>
+              <Leg color={C.orange} label="Too small"/>
+              <Leg color={C.blue}   label="Park model"/>
+              <Leg color={C.teal}   label="Selected"/>
+            </div>
+          )}
         </div>
-
-        {/* RIGHT PANEL */}
-        <aside style={{width:215,minWidth:215,background:C.navyDark,borderLeft:'1px solid rgba(93,184,168,0.12)',display:'flex',flexDirection:'column'}}>
-          <div style={{padding:'11px 14px',borderBottom:'1px solid rgba(93,184,168,0.12)',color:C.teal,fontSize:9,letterSpacing:2,textTransform:'uppercase'}}>
-            {step==='map'?'Site Details':step==='form'?'Your Information':'Reservation Sent'}
-          </div>
-          <div style={{flex:1,padding:14,overflowY:'auto',display:'flex',flexDirection:'column',gap:9}}>
-
-            {step==='map'&&!selected&&(
-              <div style={{color:'rgba(255,255,255,0.35)',fontSize:11,textAlign:'center',padding:'32px 10px',lineHeight:1.9}}>
-                {searched
-                  ?<>Tap any <span style={{color:C.green,fontWeight:600}}>green site</span> on the map to view details and reserve.</>
-                  :<>Set your dates and click <span style={{color:C.teal}}>Show available sites</span> to get started.</>}
+      ) : (
+        /* ── DESKTOP LAYOUT ── */
+        <div style={{display:'flex',flex:1,width:'100%'}}>
+          {/* Sidebar */}
+          <aside style={{width:220,minWidth:220,background:C.navyDark,borderRight:'1px solid rgba(93,184,168,0.12)',padding:14,display:'flex',flexDirection:'column',gap:12,overflowY:'auto'}}>
+            <S label="Your Stay">
+              <F label="Arrival"><input type="date" value={arrival} onChange={e=>setArrival(e.target.value)} style={iSt}/></F>
+              <F label="Departure"><input type="date" value={departure} onChange={e=>setDeparture(e.target.value)} style={iSt}/></F>
+              {nights>0&&<div style={{background:'rgba(93,184,168,0.1)',border:'1px solid rgba(93,184,168,0.25)',borderRadius:14,padding:'3px 10px',fontSize:11,color:C.teal,textAlign:'center'}}>{nights} night{nights>1?'s':''}</div>}
+            </S>
+            <Hr/>
+            <S label="Your RV">
+              <F label="Length in feet"><input type="number" value={rvLen} onChange={e=>setRvLen(e.target.value)} placeholder="e.g. 40" min="10" max="80" style={iSt}/></F>
+            </S>
+            <Hr/>
+            <S label="Filter by type">
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {FILTERS.map(f=><button key={f.k} onClick={()=>setFilter(f.k)} style={{...cS,...(filter===f.k?cA:{})}}>{f.l}</button>)}
               </div>
-            )}
+            </S>
+            <button onClick={handleSearch} style={gS}>Show available sites</button>
+            <Hr/>
+            <S label="Legend">
+              <Leg color={C.green}  label="Available"/>
+              <Leg color={C.orange} label="Too small for your rig"/>
+              <Leg color={C.red}    label="Already reserved"/>
+              <Leg color={C.blue}   label="Park model"/>
+              <Leg color={C.teal}   label="Your selection"/>
+            </S>
+            <Hr/>
+            <S label="Resort info">
+              <IR label="Check-in"  val="2:00 PM"/>
+              <IR label="Check-out" val="11 AM · PM 10 AM"/>
+              <IR label="Office"    val="Mon–Sat 9–5 · Sun 9–4"/>
+              <IR label="Phone"     val="(904) 471-3353"/>
+              <IR label="Tax"       val="+11.5% at checkout"/>
+            </S>
+          </aside>
 
-            {step==='map'&&selected&&(<>
-              <div style={{fontSize:24,fontWeight:700,color:C.teal}}>Site {selected.id}</div>
-              <div style={{fontSize:9,color:'rgba(255,255,255,0.45)',textTransform:'uppercase',letterSpacing:1}}>{ZL[selected.zone]}</div>
-              <span style={{display:'inline-block',background:'rgba(39,174,96,0.14)',color:C.green,padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:700,letterSpacing:1}}>AVAILABLE</span>
-              <div>
-                {selected.zone!=='parkmod'&&<DR label="Max RV length" val={`${selected.maxLen} ft`}/>}
-                {selected.zone==='parkmod'&&<DR label="Deposit required" val="$250"/>}
-                <DR label="Hookup" val={selected.zone==='parkmod'?'Full kitchen + linens':'30/50 amp · water · sewer'}/>
-                {cost&&<DR label="Avg nightly" val={`$${Math.round(cost.subtotal/cost.nights)}`}/>}
-                {cost&&<DR label="Nights" val={cost.nights}/>}
-              </div>
-              {cost&&(
-                <div style={{background:'rgba(93,184,168,0.08)',border:'1px solid rgba(93,184,168,0.22)',borderRadius:7,padding:'10px 12px'}}>
-                  <div style={{fontSize:9,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:1}}>Estimated total</div>
-                  <div style={{fontSize:24,color:C.teal,fontWeight:700,margin:'3px 0'}}>${cost.grand.toLocaleString()}</div>
-                  <div style={{fontSize:10,color:'rgba(255,255,255,0.38)'}}>Subtotal ${cost.subtotal} + ${cost.tax} tax</div>
-                  {selected.zone==='parkmod'&&<div style={{fontSize:9,color:'rgba(255,255,255,0.32)',marginTop:3}}>+ $100 cleaning fee</div>}
+          {/* Map */}
+          <div style={{flex:1,background:'#0a1810',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'10px 6px',overflowY:'auto'}}>
+            <div style={{position:'relative',width:mapDisplayW,height:mapDisplayH,flexShrink:0,borderRadius:6,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.5)'}}>
+              <img src="/parkmap.png" alt="Park map" style={{width:mapDisplayW,height:mapDisplayH,display:'block',userSelect:'none'}} draggable={false}/>
+              {!searched&&(
+                <div style={{position:'absolute',inset:0,background:'rgba(8,18,28,0.75)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{background:'rgba(21,35,56,0.97)',border:`1px solid rgba(93,184,168,0.45)`,borderRadius:10,padding:'22px 26px',maxWidth:230,textAlign:'center'}}>
+                    <div style={{fontSize:30,marginBottom:8}}>🗺️</div>
+                    <div style={{fontSize:13,color:C.teal,fontFamily:'Georgia,serif',marginBottom:6}}>Enter your dates first</div>
+                    <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',lineHeight:1.7}}>Click <em style={{color:C.teal}}>Show available sites</em> then tap any green site on the map.</div>
+                  </div>
                 </div>
               )}
-              {activeSpecial&&<div style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.22)',borderRadius:5,padding:'6px 9px',fontSize:9,color:C.gold,lineHeight:1.5}}>⚠ {activeSpecial.name}<br/>+$25/night · 3-night minimum</div>}
-              <button onClick={()=>setStep('form')} style={rS}>Reserve this site →</button>
-              <div style={{fontSize:9,color:'rgba(255,255,255,0.28)',textAlign:'center',lineHeight:1.6}}>Deposit at check-in. Office confirms within 24 hrs.</div>
-            </>)}
-
-            {step==='form'&&selected&&(<>
-              <div style={{background:'rgba(93,184,168,0.08)',border:'1px solid rgba(93,184,168,0.18)',borderRadius:5,padding:'6px 10px',fontSize:11,color:C.white}}>
-                Site {selected.id} · {cost?.nights} night{cost?.nights!==1?'s':''}{cost?` · $${cost.grand.toLocaleString()}`:''}
-              </div>
-              {[
-                {k:'name',l:'Full name',t:'text',p:'Jane Smith'},
-                {k:'email',l:'Email address',t:'email',p:'jane@example.com'},
-                {k:'phone',l:'Phone number',t:'tel',p:'(904) 555-0100'},
-                {k:'rig',l:'RV make/model (optional)',t:'text',p:'e.g. Entegra Cornerstone'},
-              ].map(f=>(
-                <div key={f.k} style={{display:'flex',flexDirection:'column',gap:3}}>
-                  <label style={{fontSize:10,color:'rgba(255,255,255,0.4)'}}>{f.l}</label>
-                  <input type={f.t} placeholder={f.p} value={form[f.k]} onChange={e=>{setForm(p=>({...p,[f.k]:e.target.value}));setErrors(p=>({...p,[f.k]:''}))} } style={{...iS,...(errors[f.k]?{borderColor:C.red}:{})}}/>
-                  {errors[f.k]&&<span style={{fontSize:10,color:C.red}}>{errors[f.k]}</span>}
-                </div>
-              ))}
-              <button onClick={handleSubmit} style={rS}>Submit reservation →</button>
-              <button onClick={()=>setStep('map')} style={{background:'transparent',border:'1px solid rgba(93,184,168,0.25)',color:C.teal,padding:'7px',borderRadius:5,fontSize:10,cursor:'pointer',width:'100%'}}>← Back to map</button>
-            </>)}
-
-            {step==='confirm'&&selected&&(
-              <div style={{textAlign:'center',paddingTop:12}}>
-                <div style={{fontSize:38,marginBottom:8}}>🌊</div>
-                <div style={{fontSize:14,color:C.teal,fontFamily:'Georgia,serif',marginBottom:6}}>Request submitted!</div>
-                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',lineHeight:1.7,marginBottom:10}}>The Bryn Mawr team will confirm by email within 24 hours.</div>
-                <div style={{background:'rgba(93,184,168,0.07)',border:'1px solid rgba(93,184,168,0.18)',borderRadius:6,padding:'9px 11px',marginBottom:10,textAlign:'left'}}>
-                  <DR label="Name" val={form.name}/>
-                  <DR label="Site" val={`${selected.id} · ${ZL[selected.zone]}`}/>
-                  <DR label="Arrival" val={arrival}/>
-                  <DR label="Departure" val={departure}/>
-                  {cost&&<DR label="Est. total" val={`$${cost.grand.toLocaleString()}`}/>}
-                </div>
-                <div style={{fontSize:9,color:'rgba(255,255,255,0.28)',marginBottom:10,lineHeight:1.6}}>No payment required now. Deposit due at check-in on the resort's card terminal.</div>
-                <button onClick={()=>{setStep('map');setSelected(null);setSearched(false)}} style={rS}>Start a new search</button>
-              </div>
-            )}
+              <svg style={{position:'absolute',top:0,left:0,width:mapDisplayW,height:mapDisplayH}} viewBox={`0 0 ${MAP_W} ${MAP_H}`}>
+                {visible.map(s=>{
+                  const st=siteState(s,numLen)
+                  const fill=overlayFill(s)
+                  const clickable=searched&&st==='available'
+                  const isSel=selected?.id===s.id
+                  return(
+                    <polygon key={s.id} points={s.points} fill={fill}
+                      stroke={isSel?'#fff':searched?'rgba(255,255,255,0.5)':'transparent'}
+                      strokeWidth={isSel?2:0.8}
+                      style={{cursor:clickable?'pointer':searched&&st!=='available'?'not-allowed':'default',transition:'fill 0.12s'}}
+                      onClick={()=>handleClick(s)}
+                      onMouseEnter={()=>setHovered(s.id)}
+                      onMouseLeave={()=>setHovered(null)}
+                    />
+                  )
+                })}
+              </svg>
+              {hovered&&searched&&(()=>{
+                const s=SITES.find(x=>x.id===hovered)
+                if(!s) return null
+                const st=siteState(s,numLen)
+                const stLabel=st==='booked'?'Reserved':st==='toolong'?'Too small':'Available — tap to select'
+                const stColor=st==='booked'?C.red:st==='toolong'?C.orange:C.green
+                const pts=s.points.split(' ').map(p=>p.split(',').map(Number))
+                const cx=Math.round(pts.reduce((a,p)=>a+p[0],0)/pts.length)
+                const cy=Math.round(pts.reduce((a,p)=>a+p[1],0)/pts.length)
+                const tx=Math.min(cx*SCALE+8,mapDisplayW-150)
+                const ty=Math.max(cy*SCALE-55,4)
+                return(
+                  <div style={{position:'absolute',left:tx,top:ty,background:'rgba(12,22,36,0.97)',border:`1px solid rgba(93,184,168,0.45)`,borderRadius:6,padding:'7px 11px',fontSize:11,color:'#fff',pointerEvents:'none',whiteSpace:'nowrap',zIndex:10,lineHeight:1.5,fontFamily:'sans-serif'}}>
+                    <div style={{fontWeight:700,fontSize:13}}>Site {s.id}</div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>{ZL[s.zone]}</div>
+                    <div style={{fontSize:10,color:stColor,fontWeight:600,marginTop:2}}>{stLabel}</div>
+                    {s.maxLen>0&&<div style={{fontSize:9,color:'rgba(255,255,255,0.38)',marginTop:1}}>Max {s.maxLen} ft RV</div>}
+                  </div>
+                )
+              })()}
+            </div>
           </div>
-        </aside>
-      </div>
 
-      <footer style={{background:C.navyDark,borderTop:'1px solid rgba(93,184,168,0.12)',padding:'10px 20px'}}>
-        <div style={{maxWidth:1300,margin:'0 auto',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10,color:'rgba(255,255,255,0.3)'}}>
-          <span>© 2025 Bryn Mawr Ocean Resort · 4850 A1A S, St. Augustine Beach, FL 32080 · (904) 471-3353 · rentals@brynmawroceanresort.net</span>
+          {/* Right panel */}
+          <aside style={{width:215,minWidth:215,background:C.navyDark,borderLeft:'1px solid rgba(93,184,168,0.12)',display:'flex',flexDirection:'column'}}>
+            <div style={{padding:'11px 14px',borderBottom:'1px solid rgba(93,184,168,0.12)',color:C.teal,fontSize:9,letterSpacing:2,textTransform:'uppercase'}}>
+              {step==='map'?'Site Details':step==='form'?'Your Information':'Reservation Sent'}
+            </div>
+            <div style={{flex:1,overflowY:'auto'}}>
+              <DetailPanel/>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <footer style={{background:C.navyDark,borderTop:'1px solid rgba(93,184,168,0.12)',padding:'10px 16px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:10,color:'rgba(255,255,255,0.3)',flexWrap:'wrap',gap:4,fontFamily:'sans-serif'}}>
+          <span>© 2025 Bryn Mawr Ocean Resort · 4850 A1A S, St. Augustine Beach, FL · (904) 471-3353</span>
           <span style={{color:'rgba(93,184,168,0.5)'}}>Demo by <strong style={{color:'rgba(93,184,168,0.8)'}}>Dream App Lab</strong></span>
         </div>
       </footer>
@@ -583,12 +651,13 @@ export default function BookingApp(){
 function S({label,children}){return <div style={{display:'flex',flexDirection:'column',gap:7}}><div style={{fontSize:9,letterSpacing:2,color:C.teal,textTransform:'uppercase'}}>{label}</div>{children}</div>}
 function Hr(){return <hr style={{border:'none',borderTop:'1px solid rgba(93,184,168,0.1)',margin:'2px 0'}}/>}
 function F({label,children}){return <div style={{display:'flex',flexDirection:'column',gap:3}}><label style={{fontSize:10,color:'rgba(255,255,255,0.38)'}}>{label}</label>{children}</div>}
-function L({color,label}){return <div style={{display:'flex',alignItems:'center',gap:7,fontSize:10,color:'rgba(255,255,255,0.42)'}}><div style={{width:11,height:11,borderRadius:2,background:color,flexShrink:0}}/>{label}</div>}
-function IR({label,val}){return <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,0.04)',gap:6}}><span style={{fontSize:9,color:'rgba(255,255,255,0.35)',flexShrink:0}}>{label}</span><span style={{fontSize:9,color:'#fff',textAlign:'right'}}>{val}</span></div>}
-function DR({label,val}){return <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',gap:6}}><span style={{fontSize:10,color:'rgba(255,255,255,0.38)',flexShrink:0}}>{label}</span><span style={{fontSize:11,color:'#fff',fontWeight:500,textAlign:'right'}}>{val}</span></div>}
+function Leg({color,label}){return <div style={{display:'flex',alignItems:'center',gap:6,fontSize:10,color:'rgba(255,255,255,0.55)',fontFamily:'sans-serif'}}><div style={{width:10,height:10,borderRadius:2,background:color,flexShrink:0}}/>{label}</div>}
+function IR({label,val}){return <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,0.04)',gap:6,fontFamily:'sans-serif'}}><span style={{fontSize:9,color:'rgba(255,255,255,0.35)',flexShrink:0}}>{label}</span><span style={{fontSize:9,color:'#fff',textAlign:'right'}}>{val}</span></div>}
+function DR({label,val}){return <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,0.05)',gap:6,fontFamily:'sans-serif'}}><span style={{fontSize:10,color:'rgba(255,255,255,0.38)',flexShrink:0}}>{label}</span><span style={{fontSize:11,color:'#fff',fontWeight:500,textAlign:'right'}}>{val}</span></div>}
 
-const iS={background:'rgba(255,255,255,0.07)',border:'1px solid rgba(93,184,168,0.22)',color:'#fff',padding:'6px 8px',borderRadius:5,fontSize:12,width:'100%',boxSizing:'border-box',fontFamily:'sans-serif'}
-const cS={background:'rgba(255,255,255,0.06)',border:'1px solid rgba(93,184,168,0.18)',color:'rgba(255,255,255,0.48)',padding:'3px 8px',borderRadius:12,fontSize:10,cursor:'pointer'}
+const iSt={background:'rgba(255,255,255,0.07)',border:'1px solid rgba(93,184,168,0.22)',color:'#fff',padding:'6px 8px',borderRadius:5,fontSize:12,width:'100%',boxSizing:'border-box',fontFamily:'sans-serif'}
+const cS={background:'rgba(255,255,255,0.06)',border:'1px solid rgba(93,184,168,0.18)',color:'rgba(255,255,255,0.48)',padding:'3px 8px',borderRadius:12,fontSize:10,cursor:'pointer',fontFamily:'sans-serif'}
 const cA={background:C.teal,borderColor:C.teal,color:'#0f2030',fontWeight:700}
-const gS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%'}
-const rS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:11,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%'}
+const gS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%',fontFamily:'sans-serif'}
+const rS={background:C.teal,color:'#0f2030',border:'none',padding:'9px',borderRadius:5,fontSize:11,fontWeight:700,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',width:'100%',fontFamily:'sans-serif'}
+const backS={background:'transparent',border:'1px solid rgba(93,184,168,0.3)',color:C.teal,padding:'7px',borderRadius:5,fontSize:10,cursor:'pointer',width:'100%',fontFamily:'sans-serif'}
