@@ -260,12 +260,6 @@ const SITES = [
   {id:'94',zone:'oceanside',maxLen:40,sqft:0,points:'125.7,183.3 122.7,207.7 151.5,234.9 153.6,209.9'},
   {id:'95',zone:'oceanside',maxLen:40,sqft:0,points:'132.6,156.9 128.8,162.6 126.0,183.6 153.8,210.2 157.4,182.1'},
   {id:'96',zone:'oceanside',maxLen:40,sqft:0,points:'132.3,156.6 135.4,153.0 141.5,150.9 145.8,150.7 151.8,151.2 155.5,152.4 158.6,153.9 161.3,157.6 157.6,181.7'},
-  {id:'PM1',zone:'parkmod',maxLen:0,sqft:400,points:'310,734 360,734 360,704 310,704'},
-  {id:'PM2',zone:'parkmod',maxLen:0,sqft:500,points:'364,734 414,734 414,704 364,704'},
-  {id:'PM3',zone:'parkmod',maxLen:0,sqft:400,points:'418,734 468,734 468,704 418,704'},
-  {id:'PM4',zone:'parkmod',maxLen:0,sqft:400,points:'310,768 360,768 360,738 310,738'},
-  {id:'PM5',zone:'parkmod',maxLen:0,sqft:500,points:'364,768 414,768 414,738 364,738'},
-  {id:'PM6',zone:'parkmod',maxLen:0,sqft:400,points:'418,768 468,768 468,738 418,738'},
 ]
 const BOOKED = new Set(['219','225','81','108','121','134','149','168','3','15','29','44','56','PM2','PM4','211','240','65','177','200'])
 
@@ -357,7 +351,7 @@ export default function BookingApp(){
     if(hovered===s.id&&st==='available') return 'rgba(255,255,255,0.22)'
     if(st==='booked')  return 'rgba(192,57,43,0.58)'
     if(st==='toolong') return 'rgba(230,126,34,0.55)'
-    return 'rgba(39,174,96,0.48)'
+    if(s.zone==='parkmod') return 'rgba(36,113,163,0.78)'; return 'rgba(39,174,96,0.72)'
   }
 
   const DISPLAY_W=580
